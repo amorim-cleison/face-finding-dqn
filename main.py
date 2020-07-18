@@ -3,6 +3,7 @@ import gym
 from dqn import DQN
 from face_env import FaceEnvironment
 
+
 def main():
     env = gym.make("MountainCar-v0")
     # gamma = 0.9
