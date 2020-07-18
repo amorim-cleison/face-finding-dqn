@@ -1,0 +1,6 @@
+numpy>=1.14.0
+scipy>=0.14
+keras>=2.3.1
+tensorflow>=2.1.0
+gym>=1.9.1
+opencv-python>=4.0.0

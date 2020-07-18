@@ -1,19 +1,19 @@
 import gym
 
 from dqn import DQN
-
+from face_env import FaceEnvironment
 
 def main():
     env = gym.make("MountainCar-v0")
-    gamma = 0.9
-    epsilon = .95
+    # gamma = 0.9
+    # epsilon = .95
 
     trials = 100
     trial_len = 500
 
     # updateTargetNetwork = 1000
     dqn_agent = DQN(env=env)
-    steps = []
+    # steps = []
 
     for trial in range(trials):
         cur_state = env.reset().reshape(1, 2)
@@ -39,4 +39,9 @@ def main():
 
 
 if __name__ == "__main__":
+
+    testEnv = FaceEnvironment()
+    img = testEnv._load_img('data/real_00015.jpg')
+    testEnv._detect_face(img, True)
+
     main()
