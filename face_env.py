@@ -195,9 +195,15 @@ class FaceEnvironment(gym.Env):
         left, top, right, bottom = target
         bound_left, bound_top, bound_right, bound_bottom = bounds
 
-        # Out of bounds calculation:
-        diffs = [(left - bound_left), (top - bound_top), (bound_right - right),
-                 (bound_bottom - bottom)]
+        # Diffs calculation:
+        diff_left = (left - bound_left)
+        diff_top = (top - bound_top)
+        diff_right = (bound_right - right) if (right > 0) else (
+            right - bound_left)
+        diff_bottom = (bound_bottom - bottom) if (bottom > 0) else (
+            bottom - bound_top)
+        diffs = [diff_left, diff_top, diff_right, diff_bottom]
+
         exceeds = np.array(diffs) < 0
         margins = np.where(exceeds, diffs, 0)
 
@@ -235,7 +241,7 @@ class FaceEnvironment(gym.Env):
         return img
 
     def _plot_img(self, img):
-        cv2.imshow('Image Visualization', img)
+        cv2.imshow('Environment Visualization', img)
         try:
             cv2.waitKey(1)
         except Exception:
