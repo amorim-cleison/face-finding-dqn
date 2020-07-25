@@ -1,5 +1,3 @@
-import gym
-
 from dqn import DQN
 from face_env import FaceEnvironment
 
@@ -21,7 +19,7 @@ def main():
             action = dqn_agent.act(cur_state)
             env.render()
             new_state, reward, done, _ = env.step(action)
-            reward = reward if not done else -20
+            # reward = reward if not done else -20
             print(reward)
             # new_state = new_state.reshape(1, 2)
             dqn_agent.remember(cur_state, action, reward, new_state, done)
@@ -31,18 +29,12 @@ def main():
             cur_state = new_state
             if done:
                 break
-        if step >= 199:
+        if step >= (trial_len - 1):
             print("Failed to complete trial")
         else:
             print("Completed in {} trials".format(trial))
-            break
+            # break
 
 
 if __name__ == "__main__":
-
-    # testEnv = FaceEnvironment("data/image/cityscape-person-600.jpg")
-    # testEnv.reset()
-    # testEnv.step(1)
-    # testEnv.render()
-
     main()

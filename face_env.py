@@ -2,7 +2,6 @@ import gym
 from gym import spaces
 import numpy as np
 import cv2
-import math
 from gym.utils import seeding
 
 
@@ -44,7 +43,7 @@ class FaceEnvironment(gym.Env):
     def __init__(self, img_path):
         # self.state_width = 84  # Width of images
         # self.state_height = 84  # Height of images
-        self.state_width = 350  # Width of images
+        self.state_width = 200  # Width of images
         self.state_height = 200  # Height of images
 
         self.tau = 0.0625
@@ -55,8 +54,6 @@ class FaceEnvironment(gym.Env):
         self.img = self._load_img(img_path)
 
         self.reward = {"success": 1, "out_of_range": -1, "otherwise": -0.05}
-
-        self.viewer = None
 
         # Calculate step size:
         self.num_tiles_x = 20
@@ -77,7 +74,7 @@ class FaceEnvironment(gym.Env):
         self.observation_space = spaces.Box(
             low=0,
             high=255,
-            shape=(self.state_height, self.state_width, 3),
+            shape=(self.state_height, self.state_width, self.img.shape[2]),
             dtype=np.uint8)
 
         self.seed()
@@ -90,14 +87,19 @@ class FaceEnvironment(gym.Env):
         # TODO: verificar isto
         assert self.action_space.contains(
             action), "%r (%s) invalid" % (action, type(action))
+        faces = None
+        fn_result = None
 
         # Take action over position:
         self.position = self._sum(self.position, self.actions[action])
-        self.state = self._crop_new_state(self.position)
+        out_of_range, _, sizes = self._check_out_of_range(self.position)
+
+        new_state = self._crop_new_state(self.img, self.position)
+        new_state = self._pad_img(new_state, sizes)
+        self.state = new_state
 
         # Detect face:
         faces = self._detect_face(self.state)
-        fn_result = None
 
         # If faces were found:
         if len(faces) > 0:
@@ -107,10 +109,40 @@ class FaceEnvironment(gym.Env):
             state_center = (self.state_width / 2, self.state_height / 2)
 
             d = self._distance(state_center, face_center)
-            fn_result = (d / (self.state_width + self.state_height))
+            fn_result = (d / (self.state_height + self.state_width))
 
-        reward, done = self._calculate_reward(faces, fn_result)
+        reward, done = self._calculate_reward(out_of_range, faces, fn_result)
         return np.array(self.state), reward, done, {}
+
+    def _pad_img(self, img, sizes):
+        if any(sizes > 0):
+            (top, left, bottom, right) = sizes
+            return np.pad(
+                img,
+                pad_width=((top, bottom), (left, right), (0, 0)),
+                mode="constant")
+        else:
+            return img
+
+    def _check_out_of_range(self, position):
+        # Position bounds:
+        left, top = position
+        right, bottom = left + self.state_width, top + self.state_height
+
+        # Rectangle bounds:
+        rect_left, rect_top = (0, 0)
+        rect_right, rect_bottom = rect_left + self.img.shape[
+            1], rect_top + self.img.shape[0]
+
+        # Out of bounds calculation:
+        sides = np.array(['top', 'left', 'bottom', 'right'])
+        diffs = [(top - rect_top), (left - rect_left), (rect_bottom - bottom),
+                 (rect_right - right)]
+        exceeds = np.array(diffs) < 0
+        margins = np.where(exceeds, diffs, 0)
+
+        # Return tuple (out_of_range, sides, margins (top, left, bottom, right))
+        return (any(exceeds), sides[exceeds], abs(margins))
 
     def reset(self):
         img_heigth, img_width, _ = self.img.shape
@@ -119,18 +151,20 @@ class FaceEnvironment(gym.Env):
 
         random_pos = self.np_random.uniform(low=(0, 0), high=(max_x, max_y))
         self.position = tuple(int(x) for x in random_pos)
-        self.state = self._crop_new_state(self.position)
+        self.state = self._crop_new_state(self.img, self.position)
         return self.state
 
     def render(self):
         self._plot_img(self.state)
 
     def _load_img(self, path):
-        return cv2.imread(path)
+        img = cv2.imread(path)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        img = np.reshape(img, (img.shape[0], img.shape[1], 1))
+        return img
 
     def _detect_face(self, img, plot_result=False):
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        faces = self.face_detector.detectMultiScale(gray)
+        faces = self.face_detector.detectMultiScale(img)
 
         if plot_result:
             for (x, y, w, h) in faces:
@@ -138,9 +172,14 @@ class FaceEnvironment(gym.Env):
             self._plot_img(img)
         return faces
 
-    def _crop_new_state(self, new_position: tuple):
-        (x, y) = new_position
-        return self.img[y:y + self.state_height, x:x + self.state_width]
+    def _crop_new_state(self, img, new_position: tuple):
+        (right, top) = self._sum(new_position,
+                                 (self.state_width, self.state_height))
+
+        negatives = np.array(new_position) < 0
+        (left, bottom) = np.where(negatives, 0, new_position)
+
+        return img[bottom:top, left:right]
 
     def _plot_img(self, img):
         cv2.imshow('Image Visualization', img)
@@ -153,19 +192,17 @@ class FaceEnvironment(gym.Env):
         return [sum(x) for x in zip(a, b)]
 
     def _distance(self, a: tuple, b: tuple) -> tuple:
-        x1, y1 = a
-        x2, y2 = b
-        return math.hypot(x2 - x1, y2 - y1)
+        diff = np.subtract(a, b)
+        return np.linalg.norm(diff)
 
-    def _calculate_reward(self, faces, fn_result):
-        if len(faces) > 0:
-            if fn_result <= self.tau:
-                result = "success"
-                done = True
-            else:
-                result = "otherwise"
-                done = False
-        else:
+    def _calculate_reward(self, out_of_range, faces, fn_result):
+        done = False
+
+        if out_of_range:
             result = "out_of_range"
+        elif len(faces) > 0 and fn_result <= self.tau:
+            result = "success"
             done = True
+        else:
+            result = "otherwise"
         return (self.reward[result], done)

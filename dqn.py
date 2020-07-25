@@ -1,7 +1,7 @@
 import numpy as np
 import random
 from keras.models import Sequential
-from keras.layers import Dense
+from keras.layers import Dense, InputLayer, Conv2D, Flatten
 from keras.optimizers import Adam
 
 from collections import deque
@@ -9,7 +9,7 @@ from collections import deque
 
 class DQN:
     """
-    DQN implementation as per 
+    DQN implementation as per
     https://towardsdatascience.com/reinforcement-learning-w-keras-openai-dqns-1eed3a5338c
     """
 
@@ -29,14 +29,28 @@ class DQN:
         self.target_model = self.create_model()
 
     def create_model(self):
-        model = Sequential()
         state_shape = self.env.observation_space.shape
-        model.add(Dense(24, input_dim=state_shape[0], activation="relu"))
-        model.add(Dense(48, activation="relu"))
-        model.add(Dense(24, activation="relu"))
-        model.add(Dense(self.env.action_space.n))
+        output_units = self.env.action_space.n
+
+        model = Sequential()
+        model.add(InputLayer(input_shape=state_shape))
+        model.add(
+            Conv2D(
+                filters=32, kernel_size=(8, 8), strides=4, activation="relu"))
+        model.add(
+            Conv2D(
+                filters=64, kernel_size=(4, 4), strides=2, activation="relu"))
+        model.add(
+            Conv2D(
+                filters=64, kernel_size=(3, 3), strides=1, activation="relu"))
+        model.add(Flatten())
+        model.add(Dense(units=256, activation="relu"))
+        model.add(Dense(units=output_units))
         model.compile(
             loss="mean_squared_error", optimizer=Adam(lr=self.learning_rate))
+
+        print(model.summary())
+
         return model
 
     def act(self, state):
@@ -44,7 +58,7 @@ class DQN:
         self.epsilon = max(self.epsilon_min, self.epsilon)
         if np.random.random() < self.epsilon:
             return self.env.action_space.sample()
-        return np.argmax(self.model.predict(state))
+        return np.argmax(self.model.predict(state[np.newaxis, ...]))
 
     def remember(self, state, action, reward, new_state, done):
         self.memory.append([state, action, reward, new_state, done])
@@ -57,13 +71,13 @@ class DQN:
         samples = random.sample(self.memory, batch_size)
         for sample in samples:
             state, action, reward, new_state, done = sample
-            target = self.target_model.predict(state)
+            target = self.target_model.predict(state[np.newaxis, ...])
             if done:
                 target[0][action] = reward
             else:
-                Q_future = max(self.target_model.predict(new_state)[0])
+                Q_future = max(self.target_model.predict(new_state[np.newaxis, ...])[0])
                 target[0][action] = reward + Q_future * self.gamma
-            self.model.fit(state, target, epochs=1, verbose=0)
+            self.model.fit(state[np.newaxis, ...], target, epochs=1, verbose=0)
 
     def target_train(self):
         weights = self.model.get_weights()
