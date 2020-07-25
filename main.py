@@ -4,7 +4,7 @@ from face_env import FaceEnvironment
 
 def main():
     # env = gym.make("MountainCar-v0")
-    env = FaceEnvironment("data/image/cityscape-person-600.jpg")
+    env = FaceEnvironment("data/image/cityscape-person-600.jpg", True)
 
     trials = 100
     # trial_len = 500

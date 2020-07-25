@@ -40,18 +40,29 @@ class FaceEnvironment(gym.Env):
          Episode length is greater than 20
     """
 
-    def __init__(self, img_path):
-        # self.state_width = 84  # Width of images
-        # self.state_height = 84  # Height of images
-        self.state_width = 200  # Width of images
-        self.state_height = 200  # Height of images
-
-        self.tau = 0.0625
-
+    def __init__(self, img_path: str, reset_to_face_visible: bool):
         self.face_detector = cv2.CascadeClassifier(
             "data/model/haarcascade_frontalface_default.xml")
 
         self.img = self._load_img(img_path)
+        self.img_position = (0, 0)
+        self.img_size = self.img.shape[0:2][::-1]
+        self.img_channels = self.img.shape[2]
+
+        faces = self._detect_faces(self.img)
+        self.face_bounds = self._choose_face(faces)
+        self._draw_rect(self.img, self.face_bounds)
+        self._plot_img(self.img)
+        self.reset_to_face_visible = reset_to_face_visible
+
+        self.tau = 0.0625
+        # self.state_width = 84  # Width of images
+        # self.state_height = 84  # Height of images
+        self.state_width = 200  # Width of images
+        self.state_height = 200  # Height of images
+        self.state_size = (self.state_width, self.state_height)
+        self.state_shape = (self.state_height, self.state_width,
+                            self.img_channels)
 
         self.reward = {"success": 1, "out_of_range": -1, "otherwise": -0.05}
 
@@ -84,39 +95,36 @@ class FaceEnvironment(gym.Env):
         return [seed]
 
     def step(self, action):
-        # TODO: verificar isto
         assert self.action_space.contains(
             action), "%r (%s) invalid" % (action, type(action))
-        faces = None
         fn_result = None
 
         # Take action over position:
         self.position = self._sum(self.position, self.actions[action])
-        out_of_range, _, sizes = self._check_out_of_range(self.position)
 
-        new_state = self._crop_new_state(self.img, self.position)
-        new_state = self._pad_img(new_state, sizes)
+        # Generate new state:
+        new_state, new_state_bounds, exceeds, _ = self._crop_and_correct_img(
+            self.img, self.position, self.state_size)
+        assert (new_state.shape == self.state_shape
+                ), "Generated state with wrong dimensions."
+
         self.state = new_state
 
-        # Detect face:
-        faces = self._detect_face(self.state)
+        # Verify face intersection:
+        intersects_face = self._intersects(self.face_bounds, new_state_bounds)
 
         # If faces were found:
-        if len(faces) > 0:
-            (face_x, face_y, face_width, face_height) = faces[0]
-            face_center = (face_x + (face_width / 2),
-                           face_y + (face_height / 2))
-            state_center = (self.state_width / 2, self.state_height / 2)
-
-            d = self._distance(state_center, face_center)
+        if intersects_face:
+            d = self._center_distance(self.face_bounds, new_state_bounds)
             fn_result = (d / (self.state_height + self.state_width))
 
-        reward, done = self._calculate_reward(out_of_range, faces, fn_result)
+        reward, done = self._calculate_reward(exceeds, intersects_face,
+                                              fn_result)
         return np.array(self.state), reward, done, {}
 
     def _pad_img(self, img, sizes):
         if any(sizes > 0):
-            (top, left, bottom, right) = sizes
+            (left, top, right, bottom) = sizes
             return np.pad(
                 img,
                 pad_width=((top, bottom), (left, right), (0, 0)),
@@ -124,34 +132,97 @@ class FaceEnvironment(gym.Env):
         else:
             return img
 
-    def _check_out_of_range(self, position):
-        # Position bounds:
-        left, top = position
-        right, bottom = left + self.state_width, top + self.state_height
+    def _detect_faces(self, img):
+        faces = self.face_detector.detectMultiScale(img)
 
-        # Rectangle bounds:
-        rect_left, rect_top = (0, 0)
-        rect_right, rect_bottom = rect_left + self.img.shape[
-            1], rect_top + self.img.shape[0]
+        # Map coordinates (x, y, w, h) to bounds (left, top, right, bottom):
+        return [(x, y, (x + w), (y + h)) for (x, y, w, h) in faces]
+
+    def _draw_rect(self, img, bounds: tuple):
+        left, top, right, bottom = bounds
+        cv2.rectangle(img, (left, top), (right, bottom), (255, 0, 0), 2)
+
+    def _choose_face(self, faces):
+        return faces[0]
+
+    def _intersects(self, a: tuple, b: tuple) -> bool:
+        a_left, a_top, a_right, a_bottom = a
+        b_left, b_top, b_right, b_bottom = b
+        intersects = (b_left < a_right
+                      and b_top < b_bottom) or (b_right > a_left
+                                                and b_bottom > a_top)
+        return intersects
+
+    def _center(self, bounds):
+        left, top, right, bottom = bounds
+        width = right - left
+        height = bottom - top
+        return (left + (width / 2), top + (height / 2))
+
+    def _crop_and_correct_img(self, img, position: tuple, size: tuple):
+        # Get bounds (left, top, right, bottom):
+        left, top = position
+        right, bottom = self._sum(position, size)
+        bounds = (left, top, right, bottom)
+
+        img_left, img_top = self.img_position
+        img_right, img_bottom = self._sum(self.img_position, self.img_size)
+        img_bounds = (img_left, img_top, img_right, img_bottom)
+
+        # Verify if crop will exceed bounds:
+        out_bounds, exceeds = self._get_out_bounds(bounds, img_bounds)
+
+        # Crop image:
+        new_img = self._crop_img(img, bounds)
+
+        # Pad image with out bounds:
+        new_img = self._pad_img(new_img, out_bounds)
+
+        assert (new_img.shape[:2] == size), "Cropped in a wrong size."
+        return (new_img, bounds, exceeds, out_bounds)
+
+    def _crop_img(self, img, bounds: tuple):
+        # Correct bounds:
+        negatives = np.array(bounds) < 0
+        corrected_bounds = np.where(negatives, 0, bounds)
+        (left, top, right, bottom) = corrected_bounds
+
+        # Crop image:
+        new_img = img[top:bottom, left:right]
+        return new_img
+
+    def _get_out_bounds(self, target: tuple, bounds: tuple) -> (tuple, bool):
+        left, top, right, bottom = target
+        bound_left, bound_top, bound_right, bound_bottom = bounds
 
         # Out of bounds calculation:
-        sides = np.array(['top', 'left', 'bottom', 'right'])
-        diffs = [(top - rect_top), (left - rect_left), (rect_bottom - bottom),
-                 (rect_right - right)]
+        diffs = [(left - bound_left), (top - bound_top), (bound_right - right),
+                 (bound_bottom - bottom)]
         exceeds = np.array(diffs) < 0
         margins = np.where(exceeds, diffs, 0)
 
-        # Return tuple (out_of_range, sides, margins (top, left, bottom, right))
-        return (any(exceeds), sides[exceeds], abs(margins))
+        # Return tuple (margins (left, top, right, bottom))
+        return abs(margins), any(exceeds)
 
     def reset(self):
-        img_heigth, img_width, _ = self.img.shape
-        max_x = img_width - self.state_width
-        max_y = img_heigth - self.state_height
+        if self.reset_to_face_visible:
+            (face_left, face_top, face_right, face_bottom) = self.face_bounds
+            min_x = face_right - self.state_width
+            min_y = face_bottom - self.state_height
+            max_x, max_y = face_left, face_top
+        else:
+            img_left, img_top = self.img_position
+            img_right, img_bottom = self._sim(self.img_position, self.img_size)
+            min_x, min_y = img_left, img_top
+            max_x = img_right - self.state_width
+            max_y = img_top - self.state_height
 
-        random_pos = self.np_random.uniform(low=(0, 0), high=(max_x, max_y))
+        random_pos = self.np_random.uniform(
+            low=(min_x, min_y), high=(max_x, max_y))
+
         self.position = tuple(int(x) for x in random_pos)
-        self.state = self._crop_new_state(self.img, self.position)
+        self.state, _, _, _ = self._crop_and_correct_img(
+            self.img, self.position, self.state_size)
         return self.state
 
     def render(self):
@@ -163,24 +234,6 @@ class FaceEnvironment(gym.Env):
         img = np.reshape(img, (img.shape[0], img.shape[1], 1))
         return img
 
-    def _detect_face(self, img, plot_result=False):
-        faces = self.face_detector.detectMultiScale(img)
-
-        if plot_result:
-            for (x, y, w, h) in faces:
-                cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 2)
-            self._plot_img(img)
-        return faces
-
-    def _crop_new_state(self, img, new_position: tuple):
-        (right, top) = self._sum(new_position,
-                                 (self.state_width, self.state_height))
-
-        negatives = np.array(new_position) < 0
-        (left, bottom) = np.where(negatives, 0, new_position)
-
-        return img[bottom:top, left:right]
-
     def _plot_img(self, img):
         cv2.imshow('Image Visualization', img)
         try:
@@ -191,16 +244,22 @@ class FaceEnvironment(gym.Env):
     def _sum(self, a: tuple, b: tuple) -> tuple:
         return [sum(x) for x in zip(a, b)]
 
-    def _distance(self, a: tuple, b: tuple) -> tuple:
-        diff = np.subtract(a, b)
+    def _center_distance(self, a: tuple, b: tuple) -> tuple:
+        a_left, a_top, a_right, a_bottom = a
+        a_center = self._center(a)
+
+        b_left, b_top, b_right, b_bottom = b
+        b_center = self._center(b)
+
+        diff = np.subtract(a_center, b_center)
         return np.linalg.norm(diff)
 
-    def _calculate_reward(self, out_of_range, faces, fn_result):
+    def _calculate_reward(self, out_of_range, intersects_face, fn_result):
         done = False
 
         if out_of_range:
             result = "out_of_range"
-        elif len(faces) > 0 and fn_result <= self.tau:
+        elif intersects_face and fn_result <= self.tau:
             result = "success"
             done = True
         else:
