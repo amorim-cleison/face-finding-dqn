@@ -1,10 +1,10 @@
 from dqn import DQN
-from face_env import FaceEnvironment
+from env import PeopleFramingEnvironment
 
 
 def main():
     # env = gym.make("MountainCar-v0")
-    env = FaceEnvironment("data/image/cityscape-person-600.jpg", True)
+    env = PeopleFramingEnvironment("data/image/cityscape-person-600.jpg", True)
 
     trials = 100
     # trial_len = 500
