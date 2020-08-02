@@ -1,0 +1,18 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+flake8 = "*"
+yapf = "*"
+
+[packages]
+numpy = ">=1.14.0"
+gym = ">=0.17.2"
+tensorflow = "*"
+keras = "*"
+opencv-python = ">=4.0.0"
+
+[requires]
+python_version = "3.7"
