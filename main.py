@@ -4,7 +4,7 @@ from env import PeopleFramingEnvironment
 
 def main():
     # env = gym.make("MountainCar-v0")
-    env = PeopleFramingEnvironment("data/image/cityscape-person-600.jpg", True)
+    env = PeopleFramingEnvironment("data/image/sl-person-003.png", True)
 
     trials = 100
     # trial_len = 500

@@ -10,13 +10,6 @@
             "request": "launch",
             "program": "./main.py",
             "console": "integratedTerminal"
-        },
-        {
-            "name": "Run ImageAI",
-            "type": "python",
-            "request": "launch",
-            "program": "./main_test.py",
-            "console": "integratedTerminal"
         }
     ]
 }
