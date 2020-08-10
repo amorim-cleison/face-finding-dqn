@@ -12,7 +12,6 @@ class DQN:
     DQN implementation as per
     https://towardsdatascience.com/reinforcement-learning-w-keras-openai-dqns-1eed3a5338c
     """
-
     def __init__(self, env):
         self.env = env
         self.memory = deque(maxlen=2000)
@@ -32,25 +31,28 @@ class DQN:
         state_shape = self.env.observation_space.shape
         output_units = self.env.action_space.n
 
-        model = Sequential()
-        model.add(InputLayer(input_shape=state_shape))
-        model.add(
-            Conv2D(
-                filters=32, kernel_size=(8, 8), strides=4, activation="relu"))
-        model.add(
-            Conv2D(
-                filters=64, kernel_size=(4, 4), strides=2, activation="relu"))
-        model.add(
-            Conv2D(
-                filters=64, kernel_size=(3, 3), strides=1, activation="relu"))
-        model.add(Flatten())
-        model.add(Dense(units=256, activation="relu"))
-        model.add(Dense(units=output_units))
-        model.compile(
-            loss="mean_squared_error", optimizer=Adam(lr=self.learning_rate))
+        layers = [
+            InputLayer(input_shape=state_shape),
+            Conv2D(filters=32,
+                   kernel_size=(8, 8),
+                   strides=4,
+                   activation="relu"),
+            Conv2D(filters=64,
+                   kernel_size=(4, 4),
+                   strides=2,
+                   activation="relu"),
+            Conv2D(filters=64,
+                   kernel_size=(3, 3),
+                   strides=1,
+                   activation="relu"),
+            Flatten(),
+            Dense(units=256, activation="relu"),
+            Dense(units=output_units)
+        ]
 
-        print(model.summary())
-
+        model = Sequential(layers, "DQN")
+        model.compile(loss="mean_squared_error",
+                      optimizer=Adam(lr=self.learning_rate))
         return model
 
     def act(self, state):
