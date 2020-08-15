@@ -12,15 +12,16 @@ def main():
     dqn_agent = DQN(env=env)
 
     for trial in range(trials):
-        # cur_state = env.reset().reshape(1, 2)
+        print_start(trial)
+
         cur_state = env.reset()
 
         for step in range(trial_len):
             action = dqn_agent.act(cur_state)
-            env.render()
             new_state, reward, done = env.step(action)
+            env.render()
             # reward = reward if not done else -20
-            print(reward)
+            print_progress(step, cur_state, action, reward)
             # new_state = new_state.reshape(1, 2)
             dqn_agent.remember(cur_state, action, reward, new_state, done)
 
@@ -30,10 +31,32 @@ def main():
             if done:
                 break
         if step >= (trial_len - 1):
-            print("Failed to complete trial")
+            print_end(False, trials)
         else:
-            print("Completed in {} trials".format(trial))
-            # break
+            print_end(True, trials)
+
+
+def print_start(trial):
+    print("=" * 60)
+    print(f"TRIAL {(trial+1)}")
+    print("-" * 60)
+    print(f"{'Step':5} | {'State':<25}\t {'Action'}\t {'Reward'}")
+    print("-" * 60)
+
+
+def print_progress(step, state, action, reward):
+    print(
+        f"{(step+1):<5} | S: {hash(str(state)):<25}\t A: {action}\t R: {reward:.2f}"
+    )
+
+
+def print_end(success, trials):
+    print("-" * 60)
+    if success:
+        print(f" -> Completed in {trials} trials")
+    else:
+        print(" -> Failed to complete trial")
+    print()
 
 
 if __name__ == "__main__":
