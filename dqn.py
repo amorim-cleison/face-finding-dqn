@@ -12,17 +12,17 @@ class DQN:
     DQN implementation as per
     https://towardsdatascience.com/reinforcement-learning-w-keras-openai-dqns-1eed3a5338c
     """
-    def __init__(self, env):
-        self.env = env
-        self.memory = deque(maxlen=2000)
-
-        self.gamma = 0.95
+    def __init__(self, env, memory_size, gamma, epsilon_decay, learning_rate,
+                 replay_batch_size):
         self.epsilon = 1.0
         self.epsilon_min = 0.01
-        self.epsilon_decay = 0.995
-        self.learning_rate = 0.01
-        self.tau = .05
 
+        self.env = env
+        self.memory = deque(maxlen=memory_size)
+        self.gamma = gamma
+        self.epsilon_decay = epsilon_decay
+        self.learning_rate = learning_rate
+        self.replay_batch_size = replay_batch_size
         self.model = self.create_model()
         # "hack" implemented by DeepMind to improve convergence
         self.target_model = self.create_model()
@@ -66,11 +66,11 @@ class DQN:
         self.memory.append([state, action, reward, new_state, done])
 
     def replay(self):
-        batch_size = 32
-        if len(self.memory) < batch_size:
+        if len(self.memory) < self.replay_batch_size:
             return
 
-        samples = random.sample(self.memory, batch_size)
+        samples = random.sample(self.memory, self.replay_batch_size)
+
         for sample in samples:
             state, action, reward, new_state, done = sample
             target = self.target_model.predict(state[np.newaxis, ...])
