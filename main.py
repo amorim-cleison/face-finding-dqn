@@ -17,8 +17,8 @@ def main():
 
         for step in range(trial_len):
             action = dqn_agent.act(cur_state)
-            env.render()
             new_state, reward, done = env.step(action)
+            env.render()
             # reward = reward if not done else -20
             print(reward)
             # new_state = new_state.reshape(1, 2)
@@ -38,3 +38,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+rnd_pointrnd_pointrnd_pointpointrnd_norm_pointrnd_norm_pointrnd_norm_pointnorm_pointrnd_centerrnd_centerrnd_centermin_centermin_centermax_centermax_centercentercenterscalenew_statenew_statenew_viewnew_viewnew_view
