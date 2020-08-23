@@ -86,6 +86,16 @@ def resize(img: Image, factor: float):
     return Image(data_resized)
 
 
+def resize_raw(img, width, height, channels):
+    assert (width == height)
+    cur_height, cur_width = img.shape[::-1][-2:]
+    max_dim = max(cur_height, cur_width)
+    factor = max_dim / width
+    new_size = to_int(((cur_height / factor), (cur_width / factor)))
+    new_img = cv2.resize(img, new_size, interpolation=cv2.INTER_AREA)
+    return np.reshape(new_img, (*new_size, channels))
+
+
 def load_img(path: str):
     img = cv2.imread(path)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)

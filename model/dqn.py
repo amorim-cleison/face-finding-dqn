@@ -12,7 +12,7 @@ import pickle
 import csv
 from datetime import datetime
 from hashlib import md5
-
+from environment.image_utils import resize_raw
 
 class DQN:
     """
@@ -32,7 +32,8 @@ class DQN:
                  num_episodes,
                  max_episode_len,
                  save_dir,
-                 checkpoint_file=None):
+                 checkpoint_file=None,
+                 state_shape=(84, 84, 1)):
         self.epsilon = initial_epsilon
         self.final_epsilon = final_epsilon
         self.epsilon_decay = (initial_epsilon -
@@ -44,6 +45,7 @@ class DQN:
         self.minibatch_size = minibatch_size
         self.save_dir = normpath(save_dir)
         self.checkpoint_file = normpath(checkpoint_file)
+        self.state_shape = state_shape
 
         self.discount_factor = discount_factor
         self.m = num_episodes
@@ -129,18 +131,19 @@ class DQN:
             self.__write_logs(logs)
 
     def __preprocess(self, s, a, x_next):
-        x_next = x_next[np.newaxis, :]
+        x_next_proc = x_next
+        x_next_proc = resize_raw(x_next_proc, *self.state_shape)
+        x_next_proc = x_next_proc[np.newaxis, :]
 
-        if not x_next.flags['C_CONTIGUOUS']:
-            x_next = np.ascontiguousarray(x_next)
-        return (s, a, x_next)
+        if not x_next_proc.flags['C_CONTIGUOUS']:
+            x_next_proc = np.ascontiguousarray(x_next_proc)
+        return (s, a, x_next_proc)
 
     def __create_model(self, weights=None):
-        state_shape = self.env.observation_space.shape
         output_units = self.env.action_space.n
 
         layers = [
-            InputLayer(input_shape=state_shape),
+            InputLayer(input_shape=self.state_shape),
             Conv2D(filters=32,
                    kernel_size=(8, 8),
                    strides=4,
@@ -269,7 +272,7 @@ class DQN:
             model.load_weights(weights)
 
     def __write_logs(self, logs):
-        path = normpath(f"{self.save_dir}/log.out")
+        path = normpath(f"{self.save_dir}/log.csv")
         write_header = not exists(path)
 
         if len(logs) > 0:
