@@ -276,15 +276,13 @@ class DQN:
         write_header = not exists(path)
 
         if len(logs) > 0:
-            with open(path, 'a') as csvfile:
+            with open(path, 'w', newline='') as csvfile:
                 columns = logs[0].keys()
                 writer = csv.DictWriter(csvfile, fieldnames=columns)
 
                 if write_header:
                     writer.writeheader()
-
-                for data in logs:
-                    writer.writerow(data)
+                writer.writerows(logs)
 
     def __get_hash(self, state):
         return md5(state).hexdigest()
