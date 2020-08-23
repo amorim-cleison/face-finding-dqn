@@ -1,5 +1,5 @@
 from model import DQN
-from env import PeopleFramingEnv
+from environment import PeopleFramingEnv
 
 dqn_params = {
     "minibatch_size": 32,
