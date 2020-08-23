@@ -49,28 +49,5 @@ def run(env_params, dqn_params):
     dqn_agent.run()
 
 
-def print_start(episode):
-    print("=" * 60)
-    print(f"EPISODE {(episode+1)}")
-    print("-" * 60)
-    print(f"{'Step':5} | {'State':<25}\t {'Action'}\t {'Reward'}")
-    print("-" * 60)
-
-
-def print_progress(step, state, action, reward):
-    print(
-        f"{(step+1):<5} | S: {hash(str(state)):<25}\t A: {action}\t R: {reward:.2f}"
-    )
-
-
-def print_end(success, steps):
-    print("-" * 60)
-    if success:
-        print(f" -> Completed in {(steps+1)} episodes")
-    else:
-        print(" -> Failed to complete trial")
-    print()
-
-
 if __name__ == "__main__":
     run(env_params, dqn_params)
