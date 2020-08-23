@@ -8,18 +8,15 @@ dqn_params = {
     "discount_factor": 0.99,
     "learning_rate": 0.00025,
     "gradient_momentum": 0.95,  # RMSProp
-    "squared_gradient_momentum": 0.95,  # RMSProp
-    "min_gradient_momentum": 0.01,  # RMSProp
+    # "squared_gradient_momentum": 0.95,  # RMSProp
+    # "min_gradient_momentum": 0.01,  # RMSProp
 
     "initial_epsilon": 1.,
     "final_epsilon": 0.1,
     "final_exploration_frame": 1000000,
 
-    # "replay_start_size": 50000,
-
-    # "epsilon_decay": 0.995,
     "num_episodes": 100000,
-    "max_episode_len": 20,
+    "max_episode_len": 50,
 }
 
 
@@ -30,28 +27,6 @@ def run(env_params, dqn_params):
     env = PeopleFramingEnv(**env_params)
     dqn_agent = DQN(env=env, **dqn_params)
     dqn_agent.run()
-
-
-    # for episode in range(episodes):
-    #     cur_state = env.reset()
-    #     print_start(episode)
-
-    #     for step in range(max_episode_size):
-    #         action = dqn_agent.__select_action(cur_state)
-    #         new_state, reward, done = env.step(action)
-    #         env.render()
-    #         print_progress(step, cur_state, action, reward)
-    #         dqn_agent.remember(cur_state, action, reward, new_state, done)
-
-    #         dqn_agent.__replay()
-    #         dqn_agent.__target_train()
-    #         cur_state = new_state
-    #         if done:
-    #             break
-
-    #     # Print result:
-    #     success = (step < (max_episode_size - 1))
-    #     print_end(success, episode)
 
 
 def print_start(episode):

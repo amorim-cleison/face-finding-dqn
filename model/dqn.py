@@ -23,8 +23,6 @@ class DQN:
         learning_rate,
 
         gradient_momentum,
-        squared_gradient_momentum,
-        min_gradient_momentum,
 
         initial_epsilon,
         final_epsilon,
@@ -40,6 +38,7 @@ class DQN:
 
         self.env = env
         self.learning_rate = learning_rate
+        self.gradient_momentum = gradient_momentum
         self.minibatch_size = minibatch_size
 
         self.discount_factor = discount_factor
@@ -136,10 +135,8 @@ class DQN:
 
         model = Sequential(layers, "DQN")
         model.compile(loss="mean_squared_error",
-                      optimizer=Adam(lr=self.learning_rate))
-
-        # FIXME: RMSprop
-
+                      optimizer=RMSprop(learning_rate=self.learning_rate,
+                                        momentum=self.gradient_momentum))
         return model
 
     def __select_action(self, fi):
