@@ -188,10 +188,13 @@ def exceed_bounds(target: tuple, bounds: tuple) -> (tuple, bool):
 
 
 def intersects(a: tuple, b: tuple) -> bool:
-    return (between(b[left], a[left], a[right])
-            or between(b[right], a[left], a[right])) and (
-                between(b[top], a[top], a[bottom])
-                or between(b[bottom], a[top], a[bottom]))
+    return intersection_area(a, b) > 0
+
+
+def intersection_area(a: tuple, b: tuple) -> bool:
+    dx = min(a[right], b[right]) - max(a[left], b[left])
+    dy = min(a[bottom], b[bottom]) - max(a[top], b[top])
+    return max(dx, 0) * max(dy, 0)
 
 
 def between(x, a, b):

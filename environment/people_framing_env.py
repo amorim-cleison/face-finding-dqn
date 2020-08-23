@@ -26,9 +26,9 @@ class PeopleFramingEnv(gym.Env):
 
     reward = {
         "all-ok": 10.0,
-        "partially-ok": 0,
-        "roi-visible": -1,
-        "otherwise": -3.0,
+        "partially-ok": -1.0,
+        "roi-visible": -3.0,
+        "otherwise": -5.0,
         "out-of-image": -10,
     }
 
