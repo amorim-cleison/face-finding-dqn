@@ -8,15 +8,16 @@ dqn_params = {
     "discount_factor": 0.99,
     "learning_rate": 0.00025,
     "gradient_momentum": 0.95,  # RMSProp
-    # "squared_gradient_momentum": 0.95,  # RMSProp
-    # "min_gradient_momentum": 0.01,  # RMSProp
 
     "initial_epsilon": 1.,
     "final_epsilon": 0.1,
     "final_exploration_frame": 1000000,
 
     "num_episodes": 100000,
-    "max_episode_len": 50,
+    "max_episode_len": 10,
+
+    "save_dir": "./tmp/",
+    "checkpoint_file": "./tmp/LAST.pkl"
 }
 
 
