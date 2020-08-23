@@ -9,6 +9,9 @@ from .logger import log_start, log_progress, log_finish
 from os.path import normpath, exists
 from os import mkdir
 import pickle
+import csv
+from datetime import datetime
+from hashlib import md5
 
 
 class DQN:
@@ -68,6 +71,8 @@ class DQN:
     def run(self):
         # For episode = 1, M do
         for episode in range(self.start_episode, self.m + 1):
+            logs = []
+
             # Initialize sequence `s_1 = {x_1}` and preprocessed
             # sequence `fi_1 = fi(s_1)`:
             x = self.env.reset()
@@ -84,7 +89,6 @@ class DQN:
                 # and image `x_t+1`:
                 x_next, r, finish = self.env.step(a)
                 self.env.render()
-                log_progress(t, fi[2], a, r)
 
                 # Set `s_t+1 = s_t, a_t, x_t+1` and preprocess
                 # `fi_t+1 = fi(s_t+1)`:
@@ -95,7 +99,19 @@ class DQN:
                 self.d.append((fi, a, r, fi_next, finish))
 
                 # Replay from memory:
-                self.__replay()
+                loss = self.__replay()
+                log_info = {
+                    "datetime": datetime.now(),
+                    "episode": episode,
+                    "step": t,
+                    "state": self.__get_hash(fi[2]),
+                    "action": a,
+                    "reward": r,
+                    "loss": loss,
+                    "finish": finish
+                }
+                log_progress(**log_info)
+                logs.append(log_info)
 
                 # Every C steps reset `^Q = Q`:
                 if (t % self.c == 0):
@@ -110,6 +126,7 @@ class DQN:
             # Log result and save checkpoint:
             log_finish(finish, episode)
             self.__save_checkpoint(episode)
+            self.__write_logs(logs)
 
     def __preprocess(self, s, a, x_next):
         x_next = x_next[np.newaxis, :]
@@ -164,6 +181,7 @@ class DQN:
         # Sample random minibatch of transitions (fi_j, a_j, r_j, fi_j+1) from D:
         size = min(len(self.d), self.minibatch_size)
         minibatch = random.sample(self.d, size)
+        loss = None
 
         for (fi, a, r, fi_next, finish) in minibatch:
             if finish:
@@ -180,7 +198,13 @@ class DQN:
             # Perform a gradient descent step on
             # `(y_j - Q(fi_j, a_j; thetha))^2` with respect to the network
             # parameters `thetha`:
-            self.q.fit(fi_next[2], target, epochs=1, verbose=0)
+            output = self.q.fit(fi_next[2],
+                                target,
+                                epochs=1,
+                                batch_size=1,
+                                verbose=0)
+            loss = output.history["loss"][0]
+        return loss
 
     def __update_target_network(self):
         weights = self.q.get_weights()
@@ -243,3 +267,21 @@ class DQN:
         if weights is not None:
             print(f"Loading '{weights}'...")
             model.load_weights(weights)
+
+    def __write_logs(self, logs):
+        path = normpath(f"{self.save_dir}/log.out")
+        write_header = not exists(path)
+
+        if len(logs) > 0:
+            with open(path, 'a') as csvfile:
+                columns = logs[0].keys()
+                writer = csv.DictWriter(csvfile, fieldnames=columns)
+
+                if write_header:
+                    writer.writeheader()
+
+                for data in logs:
+                    writer.writerow(data)
+
+    def __get_hash(self, state):
+        return md5(state).hexdigest()
