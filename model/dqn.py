@@ -196,14 +196,15 @@ class DQN:
 
     def __save_checkpoint(self, episode):
         checkpoint = dict()
-        print(f"Saving checkpoint (ep {episode})'...")
+        print(f"Saving checkpoint (ep{episode})...")
 
         def __create_dir(path):
             if not exists(path):
                 mkdir(path)
 
         def __save_weights(model, name, episode):
-            path = normpath(f"{weights_dir}/ep{episode}-{name}")
+            # path = normpath(f"{weights_dir}/ep{episode}-{name}")
+            path = normpath(f"{weights_dir}/LAST-{name}")
             model.save_weights(path, overwrite=True, save_format="h5")
             return path
 
@@ -225,7 +226,7 @@ class DQN:
         checkpoint["episode"] = episode
 
         # Save:
-        __save_ckp(checkpoint, f"ep{episode}")
+        # __save_ckp(checkpoint, f"ep{episode}")
         __save_ckp(checkpoint, "LAST")
 
     def __restore_checkpoint(self):

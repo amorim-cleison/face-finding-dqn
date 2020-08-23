@@ -46,7 +46,7 @@ class PeopleFramingEnv(gym.Env):
 
     # Constants:
     state_size = (200, 200)  # Width x height
-    step_size = Step((0.1, 0.1), 0.1)
+    step_size = Step((0.3, 0.3), 0.2)
 
     x, y = (0, 1)
     width, height = (0, 1)
@@ -55,7 +55,12 @@ class PeopleFramingEnv(gym.Env):
     move_left, move_right, move_up, move_down, zoom_in, zoom_out = (0, 1, 2, 3,
                                                                     4, 5)
 
-    reward = {"success": 1, "visible": -0.05, "otherwise": -1}
+    reward = {
+        "not-visible": -5.0,
+        "visible": -3,
+        "partially-ok": -1,
+        "all-ok": 10.0,
+    }
 
     def __init__(self, img_path: str):
         # Intialize image:
@@ -215,24 +220,23 @@ class PeopleFramingEnv(gym.Env):
         return view, img_cropped, exceeds
 
     def _get_reward(self, side, dist, visible):
-        # if factor < 1.5:
-        #     result = "success"
-        #     done = True
-        # elif visible:
-        #     result = "visible"
-        #     done = False
-        # else:
-        #     result = "otherwise"
-        #     done = False
-        # return (self.reward[result], done)
+        zoom_ok = (0.9 < side <= 1)
+        dist_ok = (dist <= 1)
+        done = False
 
-        if (0.9 < side <= 1) and (dist <= 1):
-            result = "success"
-            done = True
+        # Not visible:
+        if not visible:
+            result = "not-visible"
+        # Visible:
         else:
-            result = -(side + dist)
-            done = False
-        return result, done
+            if zoom_ok and dist_ok:
+                result = "all-ok"
+                done = True
+            elif zoom_ok or dist_ok:
+                result = "partially-ok"
+            else:
+                result = "visible"
+        return self.reward[result], done
 
     def _calculate_factor(self, roi: Base, view: View, img: Image):
         # Calculate "side":
