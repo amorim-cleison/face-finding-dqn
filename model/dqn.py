@@ -13,8 +13,7 @@ import pickle
 
 class DQN:
     """
-    DQN implementation as per
-    https://towardsdatascience.com/reinforcement-learning-w-keras-openai-dqns-1eed3a5338c
+    TODO: document DQN
     """
     def __init__(self,
                  env,
@@ -108,11 +107,9 @@ class DQN:
                 if finish:
                     break
 
-            # Save checkpoint:
-            self.__save_checkpoint(episode)
-
-            # Log result:
+            # Log result and save checkpoint:
             log_finish(finish, episode)
+            self.__save_checkpoint(episode)
 
     def __preprocess(self, s, a, x_next):
         x_next = x_next[np.newaxis, :]

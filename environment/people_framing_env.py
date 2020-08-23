@@ -10,38 +10,7 @@ from math import log10
 
 class PeopleFramingEnv(gym.Env):
     """
-    FIXME: corrigir
-    Description:
-        The agent (a car) is started at the bottom of a valley. For any given
-        state the agent may choose to accelerate to the left, right or cease
-        any acceleration.
-    Source:
-        The environment appeared first in Andrew Moore's PhD Thesis (1990).
-    Observation:
-        Type: Box(2)
-        Num    Observation               Min            Max
-        0      Car Position              -1.2           0.6
-        1      Car Velocity              -0.07          0.07
-    Actions:
-        Type: Discrete(3)
-        Num    Action
-        0      Accelerate to the Left
-        1      Don't accelerate
-        2      Accelerate to the Right
-        Note: This does not affect the amount of velocity affected by the
-        gravitational pull acting on the car.
-    Reward:
-         Reward of 0 is awarded if the agent reached the flag (position = 0.5)
-         on top of the mountain.
-         Reward of -1 is awarded if the position of the agent is less than 0.5.
-    Starting State:
-         The position of the car is assigned a uniform random value in
-         [-0.6 , -0.4].
-         The starting velocity of the car is always assigned to 0.
-    Episode Termination:
-         The car position is more than 0.5
-         Episode length is greater than 20
-
+    TODO: document environment
     """
 
     # Constants:
@@ -56,10 +25,11 @@ class PeopleFramingEnv(gym.Env):
                                                                     4, 5)
 
     reward = {
-        "not-visible": -5.0,
-        "visible": -3,
-        "partially-ok": -1,
         "all-ok": 10.0,
+        "partially-ok": 0,
+        "roi-visible": -1,
+        "otherwise": -3.0,
+        "out-of-image": -10,
     }
 
     def __init__(self, img_path: str):
@@ -98,7 +68,7 @@ class PeopleFramingEnv(gym.Env):
         # Verify if roi is visible:
         roi_visible = intersects(self.roi.bounds, new_view.bounds)
         factor = self._calculate_factor(self.roi, self.view, self.img)
-        reward, done = self._get_reward(*factor, roi_visible)
+        reward, done = self._get_reward(*factor, roi_visible, new_exceeds)
         return self.state.data, reward, done
 
     def reset(self):
@@ -219,23 +189,22 @@ class PeopleFramingEnv(gym.Env):
 
         return view, img_cropped, exceeds
 
-    def _get_reward(self, side, dist, visible):
+    def _get_reward(self, side, dist, roi_visible, out_of_image):
         zoom_ok = (0.9 < side <= 1)
         dist_ok = (dist <= 1)
         done = False
 
-        # Not visible:
-        if not visible:
-            result = "not-visible"
-        # Visible:
+        if zoom_ok and dist_ok:
+            result = "all-ok"
+            done = True
+        elif zoom_ok or dist_ok:
+            result = "partially-ok"
+        elif roi_visible:
+            result = "roi-visible"
+        elif out_of_image:
+            result = "out-of-image"
         else:
-            if zoom_ok and dist_ok:
-                result = "all-ok"
-                done = True
-            elif zoom_ok or dist_ok:
-                result = "partially-ok"
-            else:
-                result = "visible"
+            result = "otherwise"
         return self.reward[result], done
 
     def _calculate_factor(self, roi: Base, view: View, img: Image):
