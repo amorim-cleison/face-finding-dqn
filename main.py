@@ -1,44 +1,38 @@
-from dqn import DQN
-from env import PeopleFramingEnvironment
+from model import DQN
+from env import PeopleFramingEnv
+
+dqn_params = {
+    "minibatch_size": 32,
+    "replay_memory_size": 1000000,
+    "target_net_update_freq": 10000,
+    "discount_factor": 0.99,
+    "learning_rate": 0.00025,
+    "gradient_momentum": 0.95,  # RMSProp
+
+    "initial_epsilon": 1.,
+    "final_epsilon": 0.1,
+    "final_exploration_frame": 1000000,
+
+    "num_episodes": 100000,
+    "max_episode_len": 10,
+
+    "save_dir": "./tmp/",
+    "checkpoint_file": "./tmp/LAST.pkl"
+}
 
 
-def main():
-    # env = gym.make("MountainCar-v0")
-    env = PeopleFramingEnvironment("data/image/sl-person-003.png", False)
-
-    trials = 100
-    # trial_len = 500
-    trial_len = 20
-    dqn_agent = DQN(env=env)
-
-    for trial in range(trials):
-        print_start(trial)
-
-        cur_state = env.reset()
-
-        for step in range(trial_len):
-            action = dqn_agent.act(cur_state)
-            new_state, reward, done = env.step(action)
-            env.render()
-            # reward = reward if not done else -20
-            print_progress(step, cur_state, action, reward)
-            # new_state = new_state.reshape(1, 2)
-            dqn_agent.remember(cur_state, action, reward, new_state, done)
-
-            dqn_agent.replay()
-            dqn_agent.target_train()
-            cur_state = new_state
-            if done:
-                break
-        if step >= (trial_len - 1):
-            print_end(False, trials)
-        else:
-            print_end(True, trials)
+env_params = {"img_path": "data/image/sl-person-003.png"}
 
 
-def print_start(trial):
+def run(env_params, dqn_params):
+    env = PeopleFramingEnv(**env_params)
+    dqn_agent = DQN(env=env, **dqn_params)
+    dqn_agent.run()
+
+
+def print_start(episode):
     print("=" * 60)
-    print(f"TRIAL {(trial+1)}")
+    print(f"EPISODE {(episode+1)}")
     print("-" * 60)
     print(f"{'Step':5} | {'State':<25}\t {'Action'}\t {'Reward'}")
     print("-" * 60)
@@ -50,14 +44,14 @@ def print_progress(step, state, action, reward):
     )
 
 
-def print_end(success, trials):
+def print_end(success, steps):
     print("-" * 60)
     if success:
-        print(f" -> Completed in {trials} trials")
+        print(f" -> Completed in {(steps+1)} episodes")
     else:
         print(" -> Failed to complete trial")
     print()
 
 
 if __name__ == "__main__":
-    main()
+    run(env_params, dqn_params)
