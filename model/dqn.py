@@ -115,7 +115,6 @@ class DQN:
             log_finish(finish, episode)
 
     def __preprocess(self, s, a, x_next):
-        # TODO: implementar
         x_next = x_next[np.newaxis, :]
 
         if not x_next.flags['C_CONTIGUOUS']:
