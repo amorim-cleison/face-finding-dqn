@@ -61,7 +61,8 @@ class View(Base):
 
 
 class Step:
-    def __init__(self, move=(0, 0), scale=1.0):
+    def __init__(self, name=None, move=(0, 0), scale=1.0):
         super().__init__()
+        self.name = name
         self.scale = scale
         self.move = move

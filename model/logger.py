@@ -1,19 +1,24 @@
+text_width = 95
+
+
 def log_start(episode):
-    print("=" * 90)
+    print("=" * text_width)
     print(f"EPISODE {episode}")
-    print("-" * 90)
-    print(f"{'Step':5} | {'State':<40}\t {'Action'}\t {'Reward':<10}\t {'Loss'}")
-    print("-" * 90)
-
-
-def log_progress(step, state, action, reward, loss, **kwargs):
+    print("-" * text_width)
     print(
-        f"{step:<5} | S: {state:<40}\t A: {action}\t R: {reward:.2f}\t {loss:.6f}"
+        f"{'Step':5} | {'State':<32}\t {'Action':<12}\t {'Reward':<10}\t {'Loss'}"
     )
+    print("-" * text_width)
+
+
+def log_progress(step, state, action, action_name, reward, loss, **kwargs):
+    _action = f"{action} ({action_name})"
+    print(
+        f"{step:<5} | {state:<32}\t {_action:<12}\t {reward:.6f}\t {loss:.6f}")
 
 
 def log_finish(success, steps):
-    print("-" * 90)
+    print("-" * text_width)
     if success:
         print(f" -> Completed in {steps} step(s)")
     else:

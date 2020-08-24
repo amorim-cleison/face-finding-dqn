@@ -14,6 +14,7 @@ from datetime import datetime
 from hashlib import md5
 from environment.image_utils import resize_raw
 
+
 class DQN:
     """
     TODO: document DQN
@@ -85,7 +86,7 @@ class DQN:
 
             for t in range(1, self.t + 1):
                 # Select action:
-                a = self.__select_action(fi)
+                a, a_name = self.__select_action(fi)
 
                 # Execute action `a_t` in emulator and observe reward `r_t`
                 # and image `x_t+1`:
@@ -108,6 +109,7 @@ class DQN:
                     "step": t,
                     "state": self.__get_hash(fi[2]),
                     "action": a,
+                    "action_name": a_name,
                     "reward": r,
                     "loss": loss,
                     "finish": finish
@@ -175,10 +177,11 @@ class DQN:
 
         # With probability `epsilon` select a random action `at`
         if np.random.random() < self.epsilon:
-            return self.env.action_space.sample()
+            action = self.env.action_space.sample()
         else:
             # otherwise select `at = argmaxa Q(fi(st), a; thetha)`
-            return np.argmax(self.q.predict(fi[2]))
+            action = np.argmax(self.q.predict(fi[2]))
+        return action, self.env.get_action_name(action)
 
     def __replay(self):
         # Sample random minibatch of transitions (fi_j, a_j, r_j, fi_j+1) from D:

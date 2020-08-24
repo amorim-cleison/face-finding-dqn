@@ -14,15 +14,27 @@ class PeopleFramingEnv(gym.Env):
     """
 
     # Constants:
-    state_size = (200, 200)  # Width x height
-    step_size = Step((0.3, 0.3), 0.2)
+    state_size = (state_width, state_height) = (200, 200)  # Width x height
+    step_size = Step(move=(0.3, 0.3), scale=0.2)
+
+    min_scale = 0.10
+    max_scale = 3.00
+
+    min_center = 0.0
+    max_center = 1.0
 
     x, y = (0, 1)
     width, height = (0, 1)
     left, top, right, bottom = (0, 1, 2, 3)
 
-    move_left, move_right, move_up, move_down, zoom_in, zoom_out = (0, 1, 2, 3,
-                                                                    4, 5)
+    actions = [
+        Step("left", move=(-step_size.move[x], 0), scale=0),
+        Step("right", move=(+step_size.move[x], 0), scale=0),
+        Step("up", move=(0, -step_size.move[y]), scale=0),
+        Step("down", move=(0, +step_size.move[y]), scale=0),
+        Step("zoom in", move=(0, 0), scale=+step_size.scale),
+        Step("zoom out", move=(0, 0), scale=-step_size.scale)
+    ]
 
     reward = {
         "all-ok": 10.0,
@@ -43,7 +55,7 @@ class PeopleFramingEnv(gym.Env):
 
         # Setup action and observation spaces:
         state_shape = (*self.state_size, 1)
-        self.actions, self.action_space = self._init_actions(self.step_size)
+        self.action_space = self._init_actions(self.actions)
         self.observation_space = self._init_observation(state_shape)
         self.seed()
 
@@ -55,6 +67,7 @@ class PeopleFramingEnv(gym.Env):
         assert self.action_space.contains(
             action), "%r (%s) invalid" % (action, type(action))
 
+        # Get step:
         step = self.actions[action]
 
         # Generate state:
@@ -70,6 +83,9 @@ class PeopleFramingEnv(gym.Env):
         factor = self._calculate_factor(self.roi, self.view, self.img)
         reward, done = self._get_reward(*factor, roi_visible, new_exceeds)
         return self.state.data, reward, done
+
+    def get_action_name(self, action):
+        return self.actions[action].name
 
     def reset(self):
         assert (self.img is not None), "Image was not initialized"
@@ -90,9 +106,7 @@ class PeopleFramingEnv(gym.Env):
         norm_position = norm_point(position, self.img)
 
         # Randomize scale:
-        min_scale = 0
-        max_scale = 3
-        scale = self.np_random.uniform(low=min_scale, high=max_scale)
+        scale = self.np_random.uniform(low=self.min_scale, high=self.max_scale)
 
         # Generate and save state:
         new_view = View(norm_position, norm_center, norm_size, scale)
@@ -106,17 +120,8 @@ class PeopleFramingEnv(gym.Env):
     def render(self):
         plot_img(self.state.data)
 
-    def _init_actions(self, step_size: Step):
-        actions = {
-            self.move_left: Step((-step_size.move[self.x], 0), 0),
-            self.move_right: Step((+step_size.move[self.x], 0), 0),
-            self.move_up: Step((0, -step_size.move[self.y]), 0),
-            self.move_down: Step((0, +step_size.move[self.y]), 0),
-            self.zoom_in: Step((0, 0), +step_size.scale),
-            self.zoom_out: Step((0, 0), -step_size.scale)
-        }
-        action_space = spaces.Discrete(len(actions))
-        return actions, action_space
+    def _init_actions(self, actions):
+        return spaces.Discrete(len(actions))
 
     def _init_observation(self, state_shape):
         return spaces.Box(low=0, high=255, shape=state_shape, dtype=np.uint8)
@@ -160,8 +165,9 @@ class PeopleFramingEnv(gym.Env):
 
     def _generate_state(self, img: Image, view: View, step: Step):
         # Update scale:
-        min_scale = 0.01
-        scale = max(view.scale + step.scale, min_scale)
+        scale = view.scale + step.scale
+        scale = max(scale, self.min_scale)
+        scale = min(scale, self.max_scale)
 
         # Update image:
         img_resized = resize(img, scale)
@@ -171,7 +177,12 @@ class PeopleFramingEnv(gym.Env):
         norm_size = normalize_size(size, img_resized)
 
         # Update center:
-        norm_center = sum(view.center, step.move)
+        norm_center_x, norm_center_y = sum(view.center, step.move)
+        norm_center_x = max(norm_center_x, self.min_center)
+        norm_center_x = min(norm_center_x, self.max_center)
+        norm_center_y = max(norm_center_y, self.min_center)
+        norm_center_y = min(norm_center_y, self.max_center)
+        norm_center = (norm_center_x, norm_center_y)
         center = to_int(denorm_point(norm_center, img_resized))
 
         # Update position:
