@@ -252,6 +252,7 @@ class DQN:
         checkpoint["q_target_weights"] = __save_weights(
             self.q_target, "q_target", episode)
         checkpoint["episode"] = episode
+        checkpoint["epsilon"] = self.epsilon
 
         # Save:
         # __save_ckp(checkpoint, f"ep{episode}")
@@ -269,6 +270,7 @@ class DQN:
                 self.q_weights = checkpoint["q_weights"]
                 self.q_target_weights = checkpoint["q_target_weights"]
                 self.start_episode = checkpoint["episode"] + 1
+                self.epsilon = checkpoint["epsilon"]
 
     def __load_weights(self, model, weights):
         if weights is not None:

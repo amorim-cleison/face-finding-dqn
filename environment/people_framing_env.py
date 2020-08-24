@@ -4,8 +4,7 @@ import numpy as np
 import cv2
 from gym.utils import seeding
 from .model import Image, Step, View, Base
-from .image_utils import draw_rect, to_int, resize, load_img, plot_img, intersects, calc_distance, crop_and_pad, sum, to_bounds, norm_point, denorm_point, center, sub, half, normalize_size
-from math import log10
+from .image_utils import draw_rect, to_int, resize, load_img, plot_img, intersects, calc_distance, crop_and_pad, sum, to_bounds, norm_point, denorm_point, center, sub, half, normalize_size, mult, denormalize_size
 
 
 class PeopleFramingEnv(gym.Env):
@@ -37,10 +36,10 @@ class PeopleFramingEnv(gym.Env):
     ]
 
     reward = {
-        "all-ok": 10.0,
-        "partially-ok": -1.0,
-        "roi-visible": -3.0,
-        "otherwise": -5.0
+        "all-ok": 1.0,
+        "partially-ok": 0.0,
+        "roi-visible": -1.0,
+        "otherwise": -2.0
     }
 
     def __init__(self, img_path: str):
@@ -142,7 +141,8 @@ class PeopleFramingEnv(gym.Env):
         # Normalized ROI:
         norm_position = norm_point(roi.position, img)
         norm_size = normalize_size(roi.size, img)
-        norm_roi = Base(norm_position, None, norm_size)
+        norm_center = norm_point(roi.center, img)
+        norm_roi = Base(norm_position, norm_center, norm_size)
 
         return roi, norm_roi
 
@@ -160,7 +160,10 @@ class PeopleFramingEnv(gym.Env):
         new_position = [None, None]
         new_position[self.x] = position[self.x] - size[self.width]
         new_position[self.y] = position[self.y]
-        return Base(new_position, None, new_size)
+
+        new_center = center(new_position, new_size)
+
+        return Base(new_position, new_center, new_size)
 
     def _generate_state(self, img: Image, view: View, step: Step):
         # Update scale:
@@ -201,7 +204,7 @@ class PeopleFramingEnv(gym.Env):
 
     def _get_reward(self, side, dist, roi_visible, out_of_image):
         zoom_ok = (0.9 < side <= 1)
-        dist_ok = (dist <= 1)
+        dist_ok = (dist <= 0.1)
         done = False
 
         if zoom_ok and dist_ok:
@@ -217,12 +220,12 @@ class PeopleFramingEnv(gym.Env):
 
     def _calculate_factor(self, roi: Base, view: View, img: Image):
         # Calculate "side":
-        side = max(roi.size[self.width] / view.size[self.width],
-                   roi.size[self.height] / view.size[self.height])
+        roi_size = denormalize_size(mult(roi.size, (view.scale, view.scale)),
+                                    img)
+        side = max(roi_size[self.width] / self.state_size[self.width],
+                   roi_size[self.height] / self.state_size[self.height])
 
         # Calculate "dist":
-        denorm_view_pos = denorm_point(view.position, img)
-        dist = calc_distance(center(roi.position, roi.size), denorm_view_pos)
-        dist = log10(dist)
+        dist = calc_distance(roi.center, view.center)
 
         return side, dist

@@ -64,8 +64,9 @@ def half(a: tuple) -> tuple:
     return div(a, (2, 2))
 
 
-def center(position: tuple, size: tuple) -> tuple:
-    return tuple(int(p + (s / 2)) for p, s in zip(position, size))
+def center(position: tuple, size: tuple, as_int=True) -> tuple:
+    _center = tuple(p + (s / 2) for p, s in zip(position, size))
+    return to_int(_center) if as_int else _center
 
 
 def draw_rect(img: np.ndarray, bounds: tuple, color=(255, 0, 0)):
