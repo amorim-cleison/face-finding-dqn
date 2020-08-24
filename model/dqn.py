@@ -83,6 +83,7 @@ class DQN:
             fi = self.__preprocess(*s)
 
             log_start(episode)
+            self.env.render()
 
             for t in range(1, self.t + 1):
                 # Select action:
@@ -91,7 +92,6 @@ class DQN:
                 # Execute action `a_t` in emulator and observe reward `r_t`
                 # and image `x_t+1`:
                 x_next, r, finish = self.env.step(a)
-                self.env.render()
 
                 # Set `s_t+1 = s_t, a_t, x_t+1` and preprocess
                 # `fi_t+1 = fi(s_t+1)`:
@@ -114,6 +114,7 @@ class DQN:
                     "loss": loss,
                     "finish": finish
                 }
+                self.env.render()
                 log_progress(**log_info)
                 logs.append(log_info)
 
@@ -231,7 +232,7 @@ class DQN:
 
         def __save_weights(model, name, episode):
             # path = normpath(f"{weights_dir}/ep{episode}-{name}")
-            path = normpath(f"{weights_dir}/LAST-{name}")
+            path = normpath(f"{weights_dir}/LAST-{name}.h5")
             model.save_weights(path, overwrite=True, save_format="h5")
             return path
 

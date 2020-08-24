@@ -40,7 +40,7 @@ dqn_params = {
 }
 
 
-env_params = {"img_path": "data/image/sl-person-003.png"}
+env_params = {"img_path": "data/image/sl-person-001.png"}
 
 
 def run(env_params, dqn_params):
