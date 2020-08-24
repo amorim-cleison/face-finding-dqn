@@ -40,8 +40,7 @@ class PeopleFramingEnv(gym.Env):
         "all-ok": 10.0,
         "partially-ok": -1.0,
         "roi-visible": -3.0,
-        "otherwise": -5.0,
-        "out-of-image": -10,
+        "otherwise": -5.0
     }
 
     def __init__(self, img_path: str):
@@ -212,8 +211,6 @@ class PeopleFramingEnv(gym.Env):
             result = "partially-ok"
         elif roi_visible:
             result = "roi-visible"
-        elif out_of_image:
-            result = "out-of-image"
         else:
             result = "otherwise"
         return self.reward[result], done
