@@ -282,9 +282,11 @@ class DQN:
         write_header = not exists(path)
 
         if len(logs) > 0:
-            with open(path, 'w', newline='') as csvfile:
+            with open(path, 'a', newline='') as csvfile:
                 columns = logs[0].keys()
-                writer = csv.DictWriter(csvfile, fieldnames=columns)
+                writer = csv.DictWriter(csvfile,
+                                        fieldnames=columns,
+                                        delimiter=";")
 
                 if write_header:
                     writer.writeheader()
