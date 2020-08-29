@@ -21,19 +21,19 @@ from environment import PeopleFramingEnv
 # }
 
 dqn_params = {
-    "minibatch_size": 32,
-    "replay_memory_size": 100,
-    "target_net_update_freq": 10,
+    "minibatch_size": 10,
+    "replay_memory_size": 1000,
+    "target_net_update_freq": 50,
     "discount_factor": 0.99,
-    "learning_rate": 0.001,
-    "gradient_momentum": 0.95,  # RMSProp
+    "learning_rate": 0.0025,
+    "gradient_momentum": 0.9,  # RMSProp
 
     "initial_epsilon": 1.,
     "final_epsilon": 0.1,
-    "final_exploration_frame": 10,
+    "final_exploration_frame": 10000,
 
     "num_episodes": 100000,
-    "max_episode_len": 30,
+    "max_episode_len": 100,
 
     "save_dir": "./tmp/",
     "checkpoint_file": "./tmp/LAST.pkl"

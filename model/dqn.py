@@ -5,14 +5,14 @@ from keras.layers import Dense, InputLayer, Conv2D, Flatten
 from keras.optimizers import RMSprop
 
 from collections import deque
-from .logger import log_start, log_progress, log_finish
+from .logger import log_start, log_progress, log_finish, log_model
 from os.path import normpath, exists
 from os import mkdir
 import pickle
 import csv
 from datetime import datetime
 from hashlib import md5
-from environment.image_utils import resize_raw
+from environment.image_utils import resize_raw, get_luminance
 
 
 class DQN:
@@ -34,7 +34,7 @@ class DQN:
                  max_episode_len,
                  save_dir,
                  checkpoint_file=None,
-                 state_shape=(84, 84, 1)):
+                 state_shape=(84, 84)):
         self.epsilon = initial_epsilon
         self.final_epsilon = final_epsilon
         self.epsilon_decay = (initial_epsilon -
@@ -53,19 +53,24 @@ class DQN:
         self.t = max_episode_len
         self.c = target_net_update_freq
 
+        self.preproc_m = 4
+        self.preproc_d = deque(np.zeros((self.preproc_m, *state_shape)),
+                               maxlen=self.preproc_m)
+
         self.q_target_weights = None
         self.q_weights = None
         self.start_episode = 1
 
-        # Restore checkpoint:
-        self.__restore_checkpoint()
-
         # Initialize replay memory D to capacity N
         self.d = deque(maxlen=replay_memory_size)
+
+        # Restore checkpoint:
+        self.__restore_checkpoint()
 
         # Initialize action-value function Q with random weights
         # `thetha`
         self.q = self.__create_model(self.q_weights)
+        log_model(self.q)
 
         # Initialize target action-value function ^Q with weights
         # `thetha' = thetha`
@@ -102,16 +107,17 @@ class DQN:
                 self.d.append((fi, a, r, fi_next, finish))
 
                 # Replay from memory:
-                loss = self.__replay()
+                loss, accuracy = self.__replay()
                 log_info = {
                     "datetime": datetime.now(),
                     "episode": episode,
                     "step": t,
-                    "state": self.__get_hash(fi[2]),
+                    "state": self.__get_hash(fi),
                     "action": a,
                     "action_name": a_name,
                     "reward": r,
                     "loss": loss,
+                    "accuracy": accuracy,
                     "finish": finish
                 }
                 self.env.render()
@@ -129,43 +135,58 @@ class DQN:
                     break
 
             # Log result and save checkpoint:
-            log_finish(finish, episode)
+            log_finish(finish, t)
             self.__save_checkpoint(episode)
             self.__write_logs(logs)
 
     def __preprocess(self, s, a, x_next):
-        x_next_proc = x_next
-        x_next_proc = resize_raw(x_next_proc, *self.state_shape)
-        x_next_proc = x_next_proc[np.newaxis, :]
+        def process(x):
+            x_proc = x
+            x_proc = resize_raw(x_proc, *self.state_shape)
+            x_proc = get_luminance(x_proc)
+            return x_proc
 
-        if not x_next_proc.flags['C_CONTIGUOUS']:
-            x_next_proc = np.ascontiguousarray(x_next_proc)
-        return (s, a, x_next_proc)
+        def to_contiguous(x):
+            if not x.flags['C_CONTIGUOUS']:
+                x = np.ascontiguousarray(x)
+            return x
+
+        def reorganize(x):
+            return np.transpose(x, (1, 2, 0))
+
+        x_next_proc = process(x_next)
+        self.preproc_d.append(x_next_proc)
+        return to_contiguous(reorganize(self.preproc_d))
 
     def __create_model(self, weights=None):
         output_units = self.env.action_space.n
 
         layers = [
-            InputLayer(input_shape=self.state_shape),
-            Conv2D(filters=32,
+            InputLayer(name="input",
+                       input_shape=(*self.state_shape, self.preproc_m)),
+            Conv2D(name="conv_1",
+                   filters=32,
                    kernel_size=(8, 8),
                    strides=4,
                    activation="relu"),
-            Conv2D(filters=64,
+            Conv2D(name="conv_2",
+                   filters=64,
                    kernel_size=(4, 4),
                    strides=2,
                    activation="relu"),
-            Conv2D(filters=64,
+            Conv2D(name="conv_3",
+                   filters=64,
                    kernel_size=(3, 3),
                    strides=1,
                    activation="relu"),
-            Flatten(),
-            Dense(units=256, activation="relu"),
-            Dense(units=output_units)
+            Flatten(name="flatten"),
+            Dense(name="dense_1", units=512, activation="relu"),
+            Dense(name="dense_2", units=output_units)
         ]
 
         model = Sequential(layers, "DQN")
         model.compile(loss="mean_squared_error",
+                      metrics=['accuracy', 'mse'],
                       optimizer=RMSprop(learning_rate=self.learning_rate,
                                         momentum=self.gradient_momentum))
 
@@ -173,7 +194,7 @@ class DQN:
         return model
 
     def __select_action(self, fi):
-        self.epsilon *= self.epsilon_decay
+        self.epsilon -= self.epsilon_decay
         self.epsilon = max(self.epsilon, self.final_epsilon)
 
         # With probability `epsilon` select a random action `at`
@@ -181,14 +202,15 @@ class DQN:
             action = self.env.action_space.sample()
         else:
             # otherwise select `at = argmaxa Q(fi(st), a; thetha)`
-            action = np.argmax(self.q.predict(fi[2]))
+            action = np.argmax(self.q.predict(self.__to_single_batch(fi)))
         return action, self.env.get_action_name(action)
 
     def __replay(self):
         # Sample random minibatch of transitions (fi_j, a_j, r_j, fi_j+1) from D:
         size = min(len(self.d), self.minibatch_size)
         minibatch = random.sample(self.d, size)
-        loss = None
+        losses = []
+        accuracies = []
 
         for (fi, a, r, fi_next, finish) in minibatch:
             if finish:
@@ -196,22 +218,23 @@ class DQN:
                 y = r
             else:
                 # Otherwise, set `y_j = gamma * max_a'(^Q(fi_j+1, a'; theta')`
-                y = r + (self.discount_factor *
-                         np.max(self.q_target.predict(fi_next[2])))
+                y = r + (self.discount_factor * np.max(
+                    self.q_target.predict(self.__to_single_batch(fi_next))))
 
-            target = self.q_target.predict(fi[2])
+            target = self.q_target.predict(self.__to_single_batch(fi))
             target[0][a] = y
 
             # Perform a gradient descent step on
             # `(y_j - Q(fi_j, a_j; thetha))^2` with respect to the network
             # parameters `thetha`:
-            output = self.q.fit(fi_next[2],
+            output = self.q.fit(self.__to_single_batch(fi),
                                 target,
                                 epochs=1,
                                 batch_size=1,
                                 verbose=0)
-            loss = output.history["loss"][0]
-        return loss
+            losses.append(output.history["loss"][0])
+            accuracies.append(output.history["accuracy"][0])
+        return np.average(losses), np.average(accuracies)
 
     def __update_target_network(self):
         weights = self.q.get_weights()
@@ -219,12 +242,11 @@ class DQN:
 
         for i in range(len(target_weights)):
             target_weights[i] = weights[i]
-
         self.q_target.set_weights(target_weights)
 
     def __save_checkpoint(self, episode):
         checkpoint = dict()
-        print(f"Saving checkpoint (ep{episode})...")
+        print("Saving checkpoint...")
 
         def __create_dir(path):
             if not exists(path):
@@ -253,6 +275,8 @@ class DQN:
             self.q_target, "q_target", episode)
         checkpoint["episode"] = episode
         checkpoint["epsilon"] = self.epsilon
+        checkpoint["d"] = self.d
+        checkpoint["preproc_d"] = self.preproc_d
 
         # Save:
         # __save_ckp(checkpoint, f"ep{episode}")
@@ -271,6 +295,8 @@ class DQN:
                 self.q_target_weights = checkpoint["q_target_weights"]
                 self.start_episode = checkpoint["episode"] + 1
                 self.epsilon = checkpoint["epsilon"]
+                self.d = checkpoint["d"]
+                self.preproc_d = checkpoint["preproc_d"]
 
     def __load_weights(self, model, weights):
         if weights is not None:
@@ -294,3 +320,6 @@ class DQN:
 
     def __get_hash(self, state):
         return md5(state).hexdigest()
+
+    def __to_single_batch(self, x):
+        return x[np.newaxis, :]

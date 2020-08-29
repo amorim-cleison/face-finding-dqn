@@ -69,7 +69,7 @@ def center(position: tuple, size: tuple, as_int=True) -> tuple:
     return to_int(_center) if as_int else _center
 
 
-def draw_rect(img: np.ndarray, bounds: tuple, color=(255, 0, 0)):
+def draw_rect(img: np.ndarray, bounds: tuple, color: tuple):
     cv2.rectangle(img, (bounds[left], bounds[top]),
                   (bounds[right], bounds[bottom]), color, 2)
 
@@ -83,25 +83,21 @@ def resize(img: Image, factor: float):
 
     new_size = tuple(int(x * factor) for x in img.size)
     data_resized = cv2.resize(img.data, new_size, interpolation=cv2.INTER_AREA)
-    data_resized = np.reshape(data_resized, (*data_resized.shape, 1))
     return Image(data_resized)
 
 
-def resize_raw(img, width, height, channels):
+def resize_raw(img, width, height):
     assert (width == height)
     cur_height, cur_width = img.shape[::-1][-2:]
     max_dim = max(cur_height, cur_width)
     factor = max_dim / width
     new_size = to_int(((cur_height / factor), (cur_width / factor)))
     new_img = cv2.resize(img, new_size, interpolation=cv2.INTER_AREA)
-    return np.reshape(new_img, (*new_size, channels))
+    return new_img
 
 
 def load_img(path: str):
-    img = cv2.imread(path)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    img = np.reshape(img, (*img.shape, 1))
-    return img
+    return cv2.imread(path)
 
 
 def plot_img(img, timeout=1):
@@ -221,3 +217,7 @@ def normalize_size(size: tuple, ref: Base):
 
 def denormalize_size(norm_size: tuple, ref: Base):
     return mult(norm_size, ref.size)
+
+
+def get_luminance(img_data):
+    return cv2.cvtColor(img_data, cv2.COLOR_BGR2GRAY)

@@ -13,11 +13,12 @@ class PeopleFramingEnv(gym.Env):
     """
 
     # Constants:
-    state_size = (state_width, state_height) = (200, 200)  # Width x height
-    step_size = Step(move=(0.3, 0.3), scale=0.2)
+    state_size = (state_width, state_height) = (300, 300)  # Width x height
+    step_size_normal = Step(move=(0.20, 0.20), scale=0.20)
+    step_size_small = Step(move=(0.01, 0.01), scale=0.01)
 
     min_scale = 0.10
-    max_scale = 3.00
+    max_scale = 2.00
 
     min_center = 0.0
     max_center = 1.0
@@ -27,12 +28,21 @@ class PeopleFramingEnv(gym.Env):
     left, top, right, bottom = (0, 1, 2, 3)
 
     actions = [
-        Step("left", move=(-step_size.move[x], 0), scale=0),
-        Step("right", move=(+step_size.move[x], 0), scale=0),
-        Step("up", move=(0, -step_size.move[y]), scale=0),
-        Step("down", move=(0, +step_size.move[y]), scale=0),
-        Step("zoom in", move=(0, 0), scale=+step_size.scale),
-        Step("zoom out", move=(0, 0), scale=-step_size.scale)
+        # Normal steps:
+        Step("left", move=(-step_size_normal.move[x], 0), scale=0),
+        Step("right", move=(+step_size_normal.move[x], 0), scale=0),
+        Step("up", move=(0, -step_size_normal.move[y]), scale=0),
+        Step("down", move=(0, +step_size_normal.move[y]), scale=0),
+        Step("zoom in", move=(0, 0), scale=+step_size_normal.scale),
+        Step("zoom out", move=(0, 0), scale=-step_size_normal.scale),
+
+        # Small steps:
+        Step("left sm", move=(-step_size_small.move[x], 0), scale=0),
+        Step("right sm", move=(+step_size_small.move[x], 0), scale=0),
+        Step("up sm", move=(0, -step_size_small.move[y]), scale=0),
+        Step("down sm", move=(0, +step_size_small.move[y]), scale=0),
+        Step("zoom in sm", move=(0, 0), scale=+step_size_small.scale),
+        Step("zoom out sm", move=(0, 0), scale=-step_size_small.scale)
     ]
 
     reward = {
@@ -48,11 +58,11 @@ class PeopleFramingEnv(gym.Env):
 
         # Initialize roi:
         roi, norm_roi = self._init_roi(self.img, True)
-        draw_rect(self.img.data, roi.bounds)
+        draw_rect(self.img.data, roi.bounds, color=(0, 0, 255))
         self.roi = norm_roi
 
         # Setup action and observation spaces:
-        state_shape = (*self.state_size, 1)
+        state_shape = (*self.state_size, self.img.channels)
         self.action_space = self._init_actions(self.actions)
         self.observation_space = self._init_observation(state_shape)
         self.seed()
@@ -203,20 +213,27 @@ class PeopleFramingEnv(gym.Env):
         return view, img_cropped, exceeds
 
     def _get_reward(self, side, dist, roi_visible, out_of_image):
-        zoom_ok = (0.9 < side <= 1)
+        # zoom_ok = (0.8 < side <= 1)
+        # dist_ok = (dist <= 0.1)
+        # done = False
+        zoom_ok = (side <= 0.2)
         dist_ok = (dist <= 0.1)
-        done = False
+
+        # if zoom_ok and dist_ok:
+        #     result = "all-ok"
+        #     done = True
+        # elif zoom_ok or dist_ok:
+        #     result = "partially-ok"
+        # elif roi_visible:
+        #     result = "roi-visible"
+        # else:
+        #     result = "otherwise"
+        # return self.reward[result], done
 
         if zoom_ok and dist_ok:
-            result = "all-ok"
-            done = True
-        elif zoom_ok or dist_ok:
-            result = "partially-ok"
-        elif roi_visible:
-            result = "roi-visible"
+            return (1, True)
         else:
-            result = "otherwise"
-        return self.reward[result], done
+            return (-(side + dist), False)
 
     def _calculate_factor(self, roi: Base, view: View, img: Image):
         # Calculate "side":
@@ -224,6 +241,7 @@ class PeopleFramingEnv(gym.Env):
                                     img)
         side = max(roi_size[self.width] / self.state_size[self.width],
                    roi_size[self.height] / self.state_size[self.height])
+        side = calc_distance(side, 1)
 
         # Calculate "dist":
         dist = calc_distance(roi.center, view.center)
