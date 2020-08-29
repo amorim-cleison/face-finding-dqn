@@ -35,4 +35,14 @@ def log_model(model):
     print()
     print("-" * text_width)
     print(model.summary())
+    print("-" * text_width)
+    print()
+
+
+def log_args(args):
+    print("=" * text_width)
+    print("ARGUMENTS")
+    print("-" * text_width)
+    print(args)
+    print("-" * text_width)
     print()

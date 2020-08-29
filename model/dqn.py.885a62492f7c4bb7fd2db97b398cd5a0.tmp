@@ -23,7 +23,6 @@ class DQN:
         # Restore checkpoint:
         restored_args = self.__restore_checkpoint(checkpoint_file)
         args = restored_args if restored_args is not None else kwargs
-        log_args(args)
         self.__init_dqn(checkpoint_file=checkpoint_file, **args)
 
     def __init_dqn(self,
