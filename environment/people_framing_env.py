@@ -209,7 +209,6 @@ class PeopleFramingEnv(gym.Env):
         img_cropped, exceeds, _ = crop_and_pad(img_resized, bounds)
         assert (img_cropped.shape == self.observation_space.shape
                 ), "Generated state with wrong dimensions."
-
         return view, img_cropped, exceeds
 
     def _get_reward(self, side, dist, roi_visible, out_of_image):

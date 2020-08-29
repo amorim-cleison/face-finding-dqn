@@ -19,28 +19,45 @@ class DQN:
     """
     TODO: document DQN
     """
-    def __init__(self,
-                 env,
-                 minibatch_size,
-                 replay_memory_size,
-                 target_net_update_freq,
-                 discount_factor,
-                 learning_rate,
-                 gradient_momentum,
-                 initial_epsilon,
-                 final_epsilon,
-                 final_exploration_frame,
-                 num_episodes,
-                 max_episode_len,
-                 save_dir,
-                 checkpoint_file=None,
-                 state_shape=(84, 84)):
-        self.epsilon = initial_epsilon
+    def __init__(self, checkpoint_file=None, **kwargs):
+        # Restore checkpoint:
+        restored_args = self.__restore_checkpoint(checkpoint_file)
+        args = restored_args if restored_args is not None else kwargs
+        self.__init_dqn(checkpoint_file=checkpoint_file, **args)
+
+    def __init_dqn(self,
+                   env,
+                   minibatch_size,
+                   replay_memory_size,
+                   target_net_update_freq,
+                   discount_factor,
+                   learning_rate,
+                   gradient_momentum,
+                   initial_epsilon,
+                   final_epsilon,
+                   final_exploration_frame,
+                   num_episodes,
+                   max_episode_len,
+                   stacked_frames,
+                   save_dir,
+                   checkpoint_file=None,
+                   state_shape=(84, 84),
+                   d=None,
+                   stacked_frames_d=None,
+                   q_weights=None,
+                   q_target_weights=None,
+                   last_episode=0,
+                   epsilon=None,
+                   **kwargs):
+        self.epsilon = initial_epsilon if epsilon is None else epsilon
+        self.initial_epsilon = initial_epsilon
         self.final_epsilon = final_epsilon
+        self.final_exploration_frame = final_exploration_frame
         self.epsilon_decay = (initial_epsilon -
                               final_epsilon) / final_exploration_frame
 
         self.env = env
+        self.start_episode = last_episode + 1
         self.learning_rate = learning_rate
         self.gradient_momentum = gradient_momentum
         self.minibatch_size = minibatch_size
@@ -53,28 +70,23 @@ class DQN:
         self.t = max_episode_len
         self.c = target_net_update_freq
 
-        self.preproc_m = 4
-        self.preproc_d = deque(np.zeros((self.preproc_m, *state_shape)),
-                               maxlen=self.preproc_m)
-
-        self.q_target_weights = None
-        self.q_weights = None
-        self.start_episode = 1
+        self.stacked_frames = stacked_frames
+        self.stacked_frames_d = self.__init_stacked_frames(
+            stacked_frames,
+            state_shape) if stacked_frames_d is None else stacked_frames_d
 
         # Initialize replay memory D to capacity N
-        self.d = deque(maxlen=replay_memory_size)
-
-        # Restore checkpoint:
-        self.__restore_checkpoint()
+        self.replay_memory_size = replay_memory_size
+        self.d = deque(maxlen=replay_memory_size) if d is None else d
 
         # Initialize action-value function Q with random weights
         # `thetha`
-        self.q = self.__create_model(self.q_weights)
+        self.q = self.__create_model(q_weights)
         log_model(self.q)
 
         # Initialize target action-value function ^Q with weights
         # `thetha' = thetha`
-        self.q_target = self.__create_model(self.q_target_weights)
+        self.q_target = self.__create_model(q_target_weights)
 
     def run(self):
         # For episode = 1, M do
@@ -139,6 +151,9 @@ class DQN:
             self.__save_checkpoint(episode)
             self.__write_logs(logs)
 
+    def __init_stacked_frames(self, size, state_shape):
+        return deque(np.zeros((size, *state_shape)), maxlen=size)
+
     def __preprocess(self, s, a, x_next):
         def process(x):
             x_proc = x
@@ -155,15 +170,16 @@ class DQN:
             return np.transpose(x, (1, 2, 0))
 
         x_next_proc = process(x_next)
-        self.preproc_d.append(x_next_proc)
-        return to_contiguous(reorganize(self.preproc_d))
+        self.stacked_frames_d.append(x_next_proc)
+        return to_contiguous(reorganize(self.stacked_frames_d))
 
-    def __create_model(self, weights=None):
+    def __create_model(self, weights):
         output_units = self.env.action_space.n
 
         layers = [
             InputLayer(name="input",
-                       input_shape=(*self.state_shape, self.preproc_m)),
+                       input_shape=(*self.state_shape,
+                                    len(self.stacked_frames_d))),
             Conv2D(name="conv_1",
                    filters=32,
                    kernel_size=(8, 8),
@@ -269,34 +285,51 @@ class DQN:
         __create_dir(ckp_dir)
         __create_dir(weights_dir)
 
-        # Parameters:
-        checkpoint["q_weights"] = __save_weights(self.q, "q", episode)
-        checkpoint["q_target_weights"] = __save_weights(
-            self.q_target, "q_target", episode)
-        checkpoint["episode"] = episode
-        checkpoint["epsilon"] = self.epsilon
-        checkpoint["d"] = self.d
-        checkpoint["preproc_d"] = self.preproc_d
+        checkpoint = {
+            "env": self.env,
+            "initial_epsilon": self.initial_epsilon,
+            "final_epsilon": self.final_epsilon,
+            "final_exploration_frame": self.final_exploration_frame,
+            "epsilon": self.epsilon,
+            "learning_rate": self.learning_rate,
+            "gradient_momentum": self.gradient_momentum,
+            "minibatch_size": self.minibatch_size,
+            "replay_memory_size": self.replay_memory_size,
+            "save_dir": self.save_dir,
+            "state_shape": self.state_shape,
+            "discount_factor": self.discount_factor,
+            "num_episodes": self.m,
+            "max_episode_len": self.t,
+            "stacked_frames": self.stacked_frames,
+            "target_net_update_freq": self.c,
+            "d": self.d,
+            "stacked_frames_d": self.stacked_frames_d,
+            "q_weights": __save_weights(self.q, "q", episode),
+            "q_target_weights": __save_weights(self.q_target, "q_target",
+                                               episode),
+            "last_episode": episode
+        }
 
         # Save:
         # __save_ckp(checkpoint, f"ep{episode}")
         __save_ckp(checkpoint, "LAST")
 
-    def __restore_checkpoint(self):
+    def __restore_checkpoint(self, path):
         # TODO: assert file existence or skip?
-        if self.checkpoint_file is not None and exists(self.checkpoint_file):
+        if path is not None and exists(path):
             print("Loading checkpoint...")
 
-            with open(self.checkpoint_file, 'rb') as f:
+            with open(path, 'rb') as f:
                 checkpoint = pickle.load(f)
-
-                assert isinstance(checkpoint, dict), "Error loading checkpoint"
-                self.q_weights = checkpoint["q_weights"]
-                self.q_target_weights = checkpoint["q_target_weights"]
-                self.start_episode = checkpoint["episode"] + 1
-                self.epsilon = checkpoint["epsilon"]
-                self.d = checkpoint["d"]
-                self.preproc_d = checkpoint["preproc_d"]
+                return checkpoint
+        return None
+        # assert isinstance(checkpoint, dict), "Error loading checkpoint"
+        # self.q_weights = checkpoint["q_weights"]
+        # self.q_target_weights = checkpoint["q_target_weights"]
+        # self.start_episode = checkpoint["episode"] + 1
+        # self.epsilon = checkpoint["epsilon"]
+        # self.d = checkpoint["d"]
+        # self.stacked_frames_d = checkpoint["stacked_frames_d"]
 
     def __load_weights(self, model, weights):
         if weights is not None:
