@@ -52,14 +52,15 @@ class PeopleFramingEnv(gym.Env):
         "otherwise": -2.0
     }
 
-    def __init__(self, img_path: str):
+    def __init__(self, img_path: str, draw_roi=False):
         # Intialize image:
         self.img = self._init_img(img_path)
 
         # Initialize roi:
         roi, norm_roi = self._init_roi(self.img, True)
-        draw_rect(self.img.data, roi.bounds, color=(0, 0, 255))
         self.roi = norm_roi
+        if draw_roi:
+            draw_rect(self.img.data, roi.bounds, color=(0, 0, 255))
 
         # Setup action and observation spaces:
         state_shape = (*self.state_size, self.img.channels)

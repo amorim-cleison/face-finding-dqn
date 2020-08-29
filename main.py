@@ -27,22 +27,17 @@ dqn_params = {
     "discount_factor": 0.99,
     "learning_rate": 0.00025,
     "gradient_momentum": 0.95,  # RMSProp
-
     "initial_epsilon": 1.,
     "final_epsilon": 0.1,
     "final_exploration_frame": 10000,
-
     "num_episodes": 100000,
     "max_episode_len": 50,
-
     "stacked_frames": 4,
-
     "save_dir": "./tmp/",
     "checkpoint_file": "./tmp/LAST.pkl"
 }
 
-
-env_params = {"img_path": "data/image/sl-person-001.png"}
+env_params = {"img_path": "data/image/sl-person-001.png", "draw_roi": False}
 
 
 def run(env_params, dqn_params):
