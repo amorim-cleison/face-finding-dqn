@@ -14,8 +14,8 @@ class PeopleFramingEnv(gym.Env):
 
     # Constants:
     state_size = (state_width, state_height) = (300, 300)  # Width x height
-    step_size_normal = Step(move=(0.20, 0.20), scale=0.20)
-    step_size_small = Step(move=(0.01, 0.01), scale=0.01)
+    step_size_normal = Step(move=(0.15, 0.15), scale=0.10)
+    # step_size_small = Step(move=(0.01, 0.01), scale=0.01)
 
     min_scale = 0.10
     max_scale = 2.00
@@ -37,12 +37,12 @@ class PeopleFramingEnv(gym.Env):
         Step("zoom out", move=(0, 0), scale=-step_size_normal.scale),
 
         # Small steps:
-        Step("left sm", move=(-step_size_small.move[x], 0), scale=0),
-        Step("right sm", move=(+step_size_small.move[x], 0), scale=0),
-        Step("up sm", move=(0, -step_size_small.move[y]), scale=0),
-        Step("down sm", move=(0, +step_size_small.move[y]), scale=0),
-        Step("zoom in sm", move=(0, 0), scale=+step_size_small.scale),
-        Step("zoom out sm", move=(0, 0), scale=-step_size_small.scale)
+        # Step("left sm", move=(-step_size_small.move[x], 0), scale=0),
+        # Step("right sm", move=(+step_size_small.move[x], 0), scale=0),
+        # Step("up sm", move=(0, -step_size_small.move[y]), scale=0),
+        # Step("down sm", move=(0, +step_size_small.move[y]), scale=0),
+        # Step("zoom in sm", move=(0, 0), scale=+step_size_small.scale),
+        # Step("zoom out sm", move=(0, 0), scale=-step_size_small.scale)
     ]
 
     reward = {

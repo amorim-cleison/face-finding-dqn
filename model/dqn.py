@@ -244,7 +244,7 @@ class DQN:
             # Perform a gradient descent step on
             # `(y_j - Q(fi_j, a_j; thetha))^2` with respect to the network
             # parameters `thetha`:
-            output = self.q.fit(self.__to_single_batch(fi),
+            output = self.q.fit(self.__to_single_batch(fi_next),
                                 target,
                                 epochs=1,
                                 batch_size=1,
