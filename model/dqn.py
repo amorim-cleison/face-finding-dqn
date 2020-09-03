@@ -312,11 +312,9 @@ class DQN:
         }
 
         # Save:
-        # __save_ckp(checkpoint, f"ep{episode}")
         __save_ckp(checkpoint, "LAST")
 
     def __restore_checkpoint(self, path):
-        # TODO: assert file existence or skip?
         if path is not None and exists(path):
             print("Loading checkpoint...")
 
@@ -324,13 +322,6 @@ class DQN:
                 checkpoint = pickle.load(f)
                 return checkpoint
         return None
-        # assert isinstance(checkpoint, dict), "Error loading checkpoint"
-        # self.q_weights = checkpoint["q_weights"]
-        # self.q_target_weights = checkpoint["q_target_weights"]
-        # self.start_episode = checkpoint["episode"] + 1
-        # self.epsilon = checkpoint["epsilon"]
-        # self.d = checkpoint["d"]
-        # self.stacked_frames_d = checkpoint["stacked_frames_d"]
 
     def __load_weights(self, model, weights):
         if weights is not None:
